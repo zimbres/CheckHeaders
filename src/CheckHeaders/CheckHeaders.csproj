@@ -1,8 +1,8 @@
-<Project Sdk="Microsoft.NET.Sdk.Web">
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
 
   <PropertyGroup>
     <TargetFramework>net9.0</TargetFramework>
-    <Nullable>enable</Nullable>
+    <Nullable>disable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UserSecretsId>37936d63-9296-42ce-bba5-c0d9790307c7</UserSecretsId>
     <DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
@@ -10,11 +10,18 @@
     <AssemblyVersion>$(VersionPrefix)</AssemblyVersion>
     <FileVersion>$(VersionPrefix)</FileVersion>
     <Version>1.0.0.2</Version>
+    <Title>Check Headers</Title>
+    <Description>A web-based tool to check security headers of a website</Description>
+    <Copyright>Zimbres.COM</Copyright>
+    <Company>Zimbres.COM</Company>
+    <PackageProjectUrl>https://github.com/zimbres/CheckHeaders</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/zimbres/CheckHeaders</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
   </PropertyGroup>
 
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" Version="1.21.0" />
+    <PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" Version="1.21.2" />
     <PackageReference Include="MudBlazor" Version="8.*" />
   </ItemGroup>
 
