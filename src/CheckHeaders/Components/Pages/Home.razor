@@ -1,0 +1,381 @@
+﻿@page "/"
+
+@inject IHttpClientFactory ClientFactory
+
+<PageTitle>Header Checker</PageTitle>
+
+<MudGrid Class="mt-5" Justify="Justify.Center">
+    <MudCard>
+        <MudCardContent Class="ml-5 mr-5 mb-5">
+            <MudText Typo="Typo.h5" Class="mb-4">Check Website Headers</MudText>
+            <EditForm Model="@model" OnValidSubmit="CheckHeaders">
+                <DataAnnotationsValidator />
+                <MudGrid>
+                    <MudItem>
+                        <MudTextField @bind-Value="model.Url"
+                                      Label="URL"
+                                      Variant="Variant.Outlined"
+                                      Required="true"
+                                      Immediate="true"
+                                      For="@(() => model.Url)"
+                                      InputType="InputType.Text"
+                                      Style="width: 400px;"
+                                      OnlyValidateIfDirty="true" />
+                    </MudItem>
+                    <MudItem Class="d-flex justify-center align-center">
+                        <MudButton Disabled="@_processing"
+                                   ButtonType="ButtonType.Submit"
+                                   Variant="Variant.Filled"
+                                   Color="Color.Info"
+                                   Size="Size.Large"
+                                   Style="height: 55px;">
+                            <MudText>Check</MudText>
+                        </MudButton>
+                    </MudItem>
+                </MudGrid>
+            </EditForm>
+            @if (_processing)
+            {
+                <MudProgressLinear Color="Color.Primary"
+                                   Indeterminate="true"
+                                   Class="mt-2" />
+            }
+        </MudCardContent>
+    </MudCard>
+</MudGrid>
+
+@if (_headers?.Any() == true)
+{
+    <MudGrid Class="mt-3" Justify="Justify.Center">
+        <MudPaper Class="pa-6 ma-4" Style="max-width: 1280px; width: 100%;">
+            <MudGrid>
+                <MudItem xs="12" sm="2" Class="d-flex justify-center align-center">
+                    <MudAvatar Rounded="true" Style="@($"background:{_color}; color:#000000; height:180px; width:180px; font-size:7rem;")">
+                        @_grade
+                    </MudAvatar>
+                </MudItem>
+                <MudItem xs="12" sm="10">
+                    <MudText Typo="Typo.h5" Class="mb-2">Security Report Summary</MudText>
+                    <MudText><b>Site:</b> <MudLink Href="@_url" Target="_blank">@_url</MudLink></MudText>
+                    <MudText><b>IP Address:</b> @_ipAddress</MudText>
+                    <MudText><b>Status Code:</b> @_statusCode</MudText>
+                    <MudText><b>Report Time:</b> @DateTime.UtcNow.ToString("dd MMM yyyy HH:mm:ss") UTC</MudText>
+                    @if (_capped && _grade == "A")
+                    {
+                        <MudText Color="Color.Info"><b>Warning:</b> Grade capped from A+ to A due to Unsafe CSP</MudText>
+
+                    }
+                    <MudText Class="mt-2"><b>Headers:</b></MudText>
+                    <MudChipSet T="Color" Class="mt-1" Style="flex-wrap: wrap;">
+                        @foreach (var header in _requiredSecurityHeaders)
+                        {
+                            if (_presentHeaders.TryGetValue(header, out var value) && !string.IsNullOrWhiteSpace(value))
+                            {
+                                <MudChip Color="Color.Success" StartIcon="@Icons.Material.Filled.Check">
+                                    @header
+                                </MudChip>
+                            }
+                            else
+                            {
+                                <MudChip Color="Color.Error" StartIcon="@Icons.Material.Filled.Warning">
+                                    @header
+                                </MudChip>
+                            }
+                        }
+                    </MudChipSet>
+                </MudItem>
+            </MudGrid>
+        </MudPaper>
+    </MudGrid>
+}
+
+@if (!string.IsNullOrWhiteSpace(_error))
+{
+    <MudGrid Class="mt-3" Justify="Justify.Center">
+        <MudPaper Class="pa-6 ma-4" Style="max-width: 1280px; width: 100%;">
+            <MudAlert Severity="Severity.Error" Class="mt-1">@_error</MudAlert>
+        </MudPaper>
+    </MudGrid>
+}
+
+@if (_headers?.Any() == true)
+{
+    <MudGrid Justify="Justify.Center">
+        <MudPaper Class="pa-6 ma-4" Style="max-width: 1280px; width: 100%;">
+            @if (_missingHeaders?.Any() == true)
+            {
+                <MudAlert Severity="Severity.Error" Class="mt-1">
+                    Missing security headers:
+                    <br />
+                    <br />
+                    <ul>
+                        @foreach (var header in _missingHeaders)
+                        {
+                            <li>@header</li>
+                        }
+                    </ul>
+                </MudAlert>
+            }
+
+            @if (_cspUnsafe)
+            {
+                <MudAlert Severity="Severity.Warning" Class="mt-1">
+                    Unsafe CSP:
+                    <br />
+                    <br />
+                    <ul>
+                        @foreach (var issue in _cspIssues)
+                        {
+                            <li><b>@issue.Key</b>: @issue.Value</li>
+                        }
+                    </ul>
+                </MudAlert>
+            }
+
+            @if (_missingCspDirectives?.Any() == true)
+            {
+                <MudAlert Severity="Severity.Info" Class="mt-1">
+                    The following recommended CSP directives are missing:
+                    <br />
+                    <br />
+                    <ul>
+                        @foreach (var directive in _missingCspDirectives)
+                        {
+                            <li><b>@directive.Key</b>: @directive.Value</li>
+                        }
+                    </ul>
+                </MudAlert>
+            }
+
+            @if (_headers?.Any() == true)
+            {
+                <MudTable Items="_headers" Dense="true" Hover="true" Class="mt-4">
+                    <HeaderContent>
+                        <MudTh>Header</MudTh>
+                        <MudTh>Value</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd DataLabel="Header" Style="white-space: nowrap;">@context.Key</MudTd>
+                        <MudTd DataLabel="Value" Style="word-break: break-word;">
+                            @if (String.IsNullOrWhiteSpace(context.Value))
+                            {
+                                <MudIcon Icon="@Icons.Material.Filled.Warning" Color="Color.Warning" Class="me-1" />
+                            }
+                            else if (context.Key.Contains("Server", StringComparison.OrdinalIgnoreCase) && context.Value.Any(char.IsDigit))
+                            {
+                                <MudTooltip Text="This 'Server' header seems to advertise the software being run on the server">
+                                    <MudIcon Icon="@Icons.Material.Filled.Warning" Size="Size.Small" Color="Color.Warning" Class="mr-2" /> @context.Value
+                                </MudTooltip>
+                            }
+                            else if (context.Key.Contains("X-Powered-By", StringComparison.OrdinalIgnoreCase))
+                            {
+                                <MudTooltip Text="This header should be removed or the value changed">
+                                    <MudIcon Icon="@Icons.Material.Filled.Warning" Size="Size.Small" Color="Color.Warning" Class="mr-2" /> @context.Value
+                                </MudTooltip>
+                            }
+                            else
+                            {
+                                @context.Value
+                            }
+                        </MudTd>
+                    </RowTemplate>
+                </MudTable>
+            }
+        </MudPaper>
+    </MudGrid>
+}
+
+@code {
+    private string _url = "https://www.example.com";
+    private string _ipAddress = "0.0.0.0";
+    private Dictionary<string, string> _presentHeaders = new(StringComparer.OrdinalIgnoreCase);
+    private string _grade;
+    private string _color;
+    private string _error;
+    private bool _processing;
+    private bool _cspUnsafe;
+    private int _statusCode;
+    private bool _capped;
+    private Dictionary<string, string> _cspIssues;
+    private List<KeyValuePair<string, string>> _headers = new();
+    private List<string> _missingHeaders = new();
+
+    CheckWebsiteForm model = new CheckWebsiteForm();
+    public class CheckWebsiteForm
+    {
+        [Required]
+        public string Url { get; set; }
+    }
+
+    private readonly List<string> _recommendedCspDirectives = new()
+    {
+        "default-src",
+        "script-src",
+        "style-src",
+        "img-src",
+        "font-src",
+        "connect-src",
+        "object-src",
+        "base-uri",
+        "frame-ancestors",
+        "form-action",
+        "upgrade-insecure-requests",
+        "block-all-mixed-content"
+    };
+
+    private Dictionary<string, string> _missingCspDirectives = new();
+
+    private readonly Dictionary<string, string> _recommendedCspDirectivesWithDescriptions = new()
+    {
+        { "default-src", "Specifies the default policy for loading content like scripts, images, and styles." },
+        { "script-src", "Restricts which scripts can be executed." },
+        { "style-src", "Restricts which stylesheets can be applied." },
+        { "img-src", "Restricts the sources from which images can be loaded." },
+        { "font-src", "Restricts the sources for web fonts." },
+        { "connect-src", "Limits the origins to which you can connect (e.g., XHR, WebSocket)." },
+        { "object-src", "Specifies valid sources for the <object>, <embed>, and <applet> elements." },
+        { "base-uri", "Restricts the URLs that can be used in a document's <base> element." },
+        { "frame-ancestors", "Controls which parents can embed the page in a frame." },
+        { "form-action", "Limits the URLs that can be used as the target of forms." },
+        { "upgrade-insecure-requests", "Tells browsers to upgrade HTTP requests to HTTPS." },
+        { "block-all-mixed-content", "Prevents loading of any assets using HTTP when the site is HTTPS." }
+    };
+
+
+    private readonly HashSet<string> _requiredSecurityHeaders = new HashSet<string>(new[]
+    {
+        "X-Frame-Options",
+        "X-Content-Type-Options",
+        "Strict-Transport-Security",
+        "Content-Security-Policy",
+        "Referrer-Policy",
+        "Permissions-Policy"
+    }, StringComparer.OrdinalIgnoreCase);
+
+    private void SetGradeColor()
+    {
+        _color = _grade switch
+        {
+            "A+" or "A" => "#4CAF50",
+            "B" => "#CDDC39",
+            "C" => "#FFEB3B",
+            "D" => "#FFC107",
+            "E" => "#FF9800",
+            "F" => "#F44336",
+            _ => "#9E9E9E"
+        };
+    }
+
+    private void SetSecurityGrade()
+    {
+        int maxScore = 6;
+        int score = maxScore;
+
+        foreach (var header in _requiredSecurityHeaders)
+        {
+            if (!_presentHeaders.TryGetValue(header, out var value) || string.IsNullOrWhiteSpace(value))
+            {
+                score--;
+            }
+        }
+
+        var gradeMap = new Dictionary<int, string>
+        {
+            {6, "A+"},
+            {5, "A"},
+            {4, "B"},
+            {3, "C"},
+            {2, "D"},
+            {1, "E"},
+            {0, "F"}
+        };
+
+        if (_cspUnsafe)
+        {
+            score--;
+            _capped = true;
+        }
+
+        _grade = gradeMap.TryGetValue(score, out var g) ? g : "F";
+    }
+
+    private async Task CheckHeaders()
+    {
+        _error = null;
+        _headers = new();
+        _presentHeaders = new(StringComparer.OrdinalIgnoreCase);
+        _missingHeaders = new();
+        _grade = null;
+        _color = null;
+        _cspUnsafe = false;
+        _cspIssues = null;
+        _statusCode = 0;
+        _capped = false;
+
+        try
+        {
+            _processing = true;
+
+            if (!model.Url.Contains("https://"))
+                model.Url = $"https://{model.Url}";
+
+            var client = ClientFactory.CreateClient("IgnoreSSL");
+            var request = new HttpRequestMessage(HttpMethod.Head, model.Url);
+            client.Timeout = TimeSpan.FromSeconds(5);
+
+            using var response = await client.SendAsync(request);
+            _statusCode = (int)response.StatusCode;
+
+            _url = model.Url;
+            var host = new Uri(model.Url).Host;
+            _ipAddress = (await Dns.GetHostAddressesAsync(host)).FirstOrDefault()?.ToString() ?? "Unknown";
+            var headerDict = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var header in response.Headers)
+                headerDict[header.Key] = string.Join(", ", header.Value);
+
+            foreach (var header in response.Content.Headers)
+                headerDict[header.Key] = string.Join(", ", header.Value);
+
+            _presentHeaders = headerDict;
+            _headers = headerDict.ToList();
+
+            foreach (var required in _requiredSecurityHeaders)
+            {
+                if (!headerDict.ContainsKey(required))
+                {
+                    _missingHeaders.Add(required);
+                }
+            }
+            _processing = false;
+
+            if (headerDict.TryGetValue("Content-Security-Policy", out var csp))
+            {
+                if (CSPInspector.IsCSPUnsafeDetailed(csp, out var issues))
+                {
+                    _cspUnsafe = true;
+                    _cspIssues = issues;
+                }
+
+                _missingCspDirectives = _recommendedCspDirectivesWithDescriptions
+                    .Where(kvp => !csp.Contains(kvp.Key, StringComparison.OrdinalIgnoreCase))
+                    .ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
+            }
+            else
+            {
+                _cspUnsafe = false;
+                _cspIssues = null;
+                _missingCspDirectives = _recommendedCspDirectivesWithDescriptions;
+            }
+
+            SetSecurityGrade();
+            SetGradeColor();
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to fetch headers: {ex.Message}";
+            _processing = false;
+        }
+    }
+}
