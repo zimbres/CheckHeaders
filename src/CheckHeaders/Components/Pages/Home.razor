@@ -60,10 +60,9 @@
                     <MudText><b>IP Address:</b> @_ipAddress</MudText>
                     <MudText><b>Status Code:</b> @_statusCode</MudText>
                     <MudText><b>Report Time:</b> @DateTime.UtcNow.ToString("dd MMM yyyy HH:mm:ss") UTC</MudText>
-                    @if (_capped && _grade == "A")
+                    @if (_capped)
                     {
-                        <MudText Color="Color.Info"><b>Warning:</b> Grade capped from A+ to A due to Unsafe CSP</MudText>
-
+                        <MudText Color="Color.Info"><b>Warning:</b> Grade capped. Check headers warnings</MudText>
                     }
                     <MudText Class="mt-2"><b>Headers:</b></MudText>
                     <MudChipSet T="Color" Class="mt-1" Style="flex-wrap: wrap;">
@@ -173,6 +172,24 @@
                                     <MudIcon Icon="@Icons.Material.Filled.Warning" Size="Size.Small" Color="Color.Warning" Class="mr-2" /> @context.Value
                                 </MudTooltip>
                             }
+                            else if (context.Key.Contains("Access-Control-Allow-Origin", StringComparison.OrdinalIgnoreCase) && context.Value.Contains("*"))
+                            {
+                                <MudTooltip Text="This is dangerous for APIs with sensitive data">
+                                    <MudIcon Icon="@Icons.Material.Filled.Warning" Size="Size.Small" Color="Color.Warning" Class="mr-2" /> @context.Value
+                                </MudTooltip>
+                            }
+                            else if (context.Key.Contains("Access-Control-Allow-Credentials", StringComparison.OrdinalIgnoreCase) && context.Value.Contains("true", StringComparison.OrdinalIgnoreCase))
+                            {
+                                <MudTooltip Text="Insecure, allows cookies to be sent cross-origin">
+                                    <MudIcon Icon="@Icons.Material.Filled.Warning" Size="Size.Small" Color="Color.Warning" Class="mr-2" /> @context.Value
+                                </MudTooltip>
+                            }
+                            else if (context.Key.Contains("X-Frame-Options", StringComparison.OrdinalIgnoreCase) && context.Value.Contains("ALLOWALL", StringComparison.OrdinalIgnoreCase))
+                            {
+                                <MudTooltip Text="Clickjacking risk">
+                                    <MudIcon Icon="@Icons.Material.Filled.Warning" Size="Size.Small" Color="Color.Warning" Class="mr-2" /> @context.Value
+                                </MudTooltip>
+                            }
                             else
                             {
                                 @context.Value
@@ -256,7 +273,7 @@
     {
         _color = _grade switch
         {
-            "A+" or "A" => "#4CAF50",
+            "A+" or "A" or "A-" => "#4CAF50",
             "B" => "#CDDC39",
             "C" => "#FFEB3B",
             "D" => "#FFC107",
@@ -290,14 +307,55 @@
             {0, "F"}
         };
 
-        if (_cspUnsafe)
+        _grade = gradeMap.TryGetValue(score, out var g) ? g : "F";
+
+        if (_capped)
         {
-            score--;
+            _grade = _grade.Replace("+", "");
+            _grade = _grade + "-";
             _capped = true;
         }
-
-        _grade = gradeMap.TryGetValue(score, out var g) ? g : "F";
     }
+
+    private void GradeCapping(Dictionary<string, string> presentHeaders)
+    {
+        foreach (var header in presentHeaders)
+        {
+            if (String.IsNullOrWhiteSpace(header.Value))
+            {
+                _capped = true;
+            }
+            else if (header.Key.Contains("Server", StringComparison.OrdinalIgnoreCase) && header.Value.Any(char.IsDigit))
+            {
+                _capped = true;
+            }
+            else if (header.Key.Contains("X-Powered-By", StringComparison.OrdinalIgnoreCase))
+            {
+                _capped = true;
+            }
+            else if (header.Key.Contains("Access-Control-Allow-Origin", StringComparison.OrdinalIgnoreCase) && header.Value.Contains("*"))
+            {
+                _capped = true;
+            }
+            else if (header.Key.Contains("Access-Control-Allow-Credentials", StringComparison.OrdinalIgnoreCase) && header.Value.Contains("true", StringComparison.OrdinalIgnoreCase))
+            {
+                _capped = true;
+            }
+            else if (header.Key.Contains("X-Frame-Options", StringComparison.OrdinalIgnoreCase) && header.Value.Contains("ALLOWALL", StringComparison.OrdinalIgnoreCase))
+            {
+                _capped = true;
+            }
+            else if (_cspUnsafe)
+            {
+                _capped = true;
+            }
+            else
+            {
+                _capped = false;
+            }
+        }
+    }
+
 
     private async Task CheckHeaders()
     {
@@ -368,6 +426,7 @@
                 _missingCspDirectives = _recommendedCspDirectivesWithDescriptions;
             }
 
+            GradeCapping(_presentHeaders);
             SetSecurityGrade();
             SetGradeColor();
             StateHasChanged();
