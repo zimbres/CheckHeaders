@@ -18,7 +18,7 @@
                                       Required="true"
                                       Immediate="true"
                                       For="@(() => model.Url)"
-                                      InputType="InputType.Text"
+                                      InputType="InputType.Url"
                                       Style="width: 400px;"
                                       OnlyValidateIfDirty="true" />
                     </MudItem>
@@ -31,6 +31,10 @@
                                    Style="height: 55px;">
                             <MudText>Check</MudText>
                         </MudButton>
+                    </MudItem>
+                    <MudItem Class="d-flex justify-center align-center">
+                        <MudCheckBox Color="Color.Info" @bind-Value="_followRedirects"></MudCheckBox>
+                        <MudText Typo="Typo.subtitle2" Align="Align.Center">Follow <br /> Redirects</MudText>
                     </MudItem>
                 </MudGrid>
             </EditForm>
@@ -216,6 +220,7 @@
     private Dictionary<string, string> _cspIssues;
     private List<KeyValuePair<string, string>> _headers = new();
     private List<string> _missingHeaders = new();
+    private bool _followRedirects = true;
 
     CheckWebsiteForm model = new CheckWebsiteForm();
     public class CheckWebsiteForm
@@ -285,8 +290,7 @@
 
     private void SetSecurityGrade()
     {
-        int maxScore = 6;
-        int score = maxScore;
+        int score = 6;
 
         foreach (var header in _requiredSecurityHeaders)
         {
@@ -370,11 +374,13 @@
         {
             _processing = true;
 
-            if (!model.Url.Contains("https://"))
-                model.Url = $"https://{model.Url}";
-
-            var client = ClientFactory.CreateClient("IgnoreSSL");
             var request = new HttpRequestMessage(HttpMethod.Head, model.Url);
+            var handler = new HttpClientHandler()
+                {
+                    AllowAutoRedirect = _followRedirects,
+                    ServerCertificateCustomValidationCallback = HttpClientHandler.DangerousAcceptAnyServerCertificateValidator
+                };
+            using var client = new HttpClient(handler);
             client.Timeout = TimeSpan.FromSeconds(5);
 
             using var response = await client.SendAsync(request);

@@ -9,7 +9,7 @@
     <DockerfileContext>..\..</DockerfileContext>
     <AssemblyVersion>$(VersionPrefix)</AssemblyVersion>
     <FileVersion>$(VersionPrefix)</FileVersion>
-    <Version>1.0.0.3</Version>
+    <Version>1.0.0.4</Version>
     <Title>Check Headers</Title>
     <Description>A web-based tool to check security headers of a website</Description>
     <Copyright>Zimbres.COM</Copyright>
