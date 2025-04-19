@@ -9,7 +9,7 @@
     <DockerfileContext>..\..</DockerfileContext>
     <AssemblyVersion>$(VersionPrefix)</AssemblyVersion>
     <FileVersion>$(VersionPrefix)</FileVersion>
-    <Version>1.0.0.4</Version>
+    <Version>1.0.0.5</Version>
     <Title>Check Headers</Title>
     <Description>A web-based tool to check security headers of a website</Description>
     <Copyright>Zimbres.COM</Copyright>
@@ -17,7 +17,13 @@
     <PackageProjectUrl>https://github.com/zimbres/CheckHeaders</PackageProjectUrl>
     <RepositoryUrl>https://github.com/zimbres/CheckHeaders</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
+    <PackageIcon></PackageIcon>
+    <ApplicationIcon>blazor.ico</ApplicationIcon>
   </PropertyGroup>
+
+  <ItemGroup>
+    <Content Include="blazor.ico" />
+  </ItemGroup>
 
 
   <ItemGroup>

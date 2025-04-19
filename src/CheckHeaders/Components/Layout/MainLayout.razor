@@ -7,7 +7,9 @@
 
 <MudLayout>
     <MudAppBar Elevation="1">
-        <MudIcon Icon="@Icons.Material.Filled.Security" Class="ml-3" />
+        <MudTooltip Text="@_version" Placement="Placement.Right">
+            <MudIcon Icon="@Icons.Material.Filled.Security" Class="ml-3" />
+        </MudTooltip>
         <MudSpacer />
         <MudIconButton Icon="@(DarkLightModeButtonIcon)" Color="Color.Inherit" OnClick="@DarkModeToggle" />
     </MudAppBar>
@@ -35,6 +37,7 @@
 @code {
     private bool _isDarkMode = true;
     private MudTheme? _theme = null;
+    private string _version = "0.0";
 
     protected override void OnInitialized()
     {
@@ -46,6 +49,8 @@
                 PaletteDark = _darkPalette,
                 LayoutProperties = new LayoutProperties()
             };
+
+        _version = Assembly.GetExecutingAssembly().GetName().Version?.ToString();
     }
 
     private void DarkModeToggle()
